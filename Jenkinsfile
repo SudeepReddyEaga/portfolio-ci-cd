@@ -1,15 +1,14 @@
 pipeline {
-
     agent any
 
     environment {
-        DOCKER_IMAGE = "sudeepkumarreddyeaga/portfolio-ci-cd"
-        TAG = "latest"
+        IMAGE_NAME = "sudeepkumarreddyeaga/portfolio-ci-cd"
+        IMAGE_TAG = "latest"
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'main',
                 url: 'https://github.com/SudeepReddyEaga/portfolio-ci-cd.git'
@@ -18,13 +17,12 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE:$TAG .'
+                sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
             }
         }
 
         stage('Push To DockerHub') {
             steps {
-
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
                     usernameVariable: 'DOCKER_USER',
@@ -33,7 +31,7 @@ pipeline {
 
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
 
-                    sh 'docker push $DOCKER_IMAGE:$TAG'
+                    sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
                 }
             }
         }
@@ -41,10 +39,35 @@ pipeline {
         stage('Deploy To Kubernetes') {
             steps {
 
-                sh 'kubectl apply -f k8s/deployment.yaml'
-                sh 'kubectl apply -f k8s/service.yaml'
+                sh '''
+                KUBECONFIG=/var/jenkins_home/.kube/config \
+                kubectl apply -f k8s/deployment.yaml --validate=false
+                '''
 
-                sh 'kubectl rollout restart deployment portfolio-deployment'
+                sh '''
+                KUBECONFIG=/var/jenkins_home/.kube/config \
+                kubectl apply -f k8s/service.yaml --validate=false
+                '''
+
+                sh '''
+                KUBECONFIG=/var/jenkins_home/.kube/config \
+                kubectl rollout restart deployment portfolio-deployment
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+
+                sh '''
+                KUBECONFIG=/var/jenkins_home/.kube/config \
+                kubectl get pods
+                '''
+
+                sh '''
+                KUBECONFIG=/var/jenkins_home/.kube/config \
+                kubectl get services
+                '''
             }
         }
     }
@@ -52,7 +75,7 @@ pipeline {
     post {
 
         success {
-            echo 'Pipeline Executed Successfully!'
+            echo 'CI/CD Pipeline Executed Successfully!'
         }
 
         failure {
