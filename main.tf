@@ -3,8 +3,8 @@ provider "aws" {
 }
 
 resource "aws_instance" "portfolio_server" {
-  ami           = "ami-0440d3b780d96b29d"
-  instance_type = "t3.micro"
+  ami           = "Your ami number"
+  instance_type = "your instance type"
 
   vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
 
